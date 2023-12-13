@@ -23,7 +23,7 @@
 // THE SOFTWARE.
 
 enum MSALNativeAuthSignUpStartValidatedResponse: Equatable {
-    case verificationRequired(signUpToken: String, unverifiedAttributes: [String])
+    case success(continuationToken: String)
     case attributeValidationFailed(invalidAttributes: [String])
     case redirect
     case error(MSALNativeAuthSignUpStartResponseError)

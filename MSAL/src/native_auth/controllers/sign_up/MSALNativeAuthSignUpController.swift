@@ -152,13 +152,8 @@ final class MSALNativeAuthSignUpController: MSALNativeAuthBaseController, MSALNa
         context: MSIDRequestContext
     ) async -> SignUpStartControllerResponse {
         switch result {
-        case .verificationRequired(let signUpToken, let attributes):
-            MSALLogger.log(
-                level: .info,
-                context: context,
-                format: "verification_required received from signup/start with password request for attributes: \(attributes)"
-            )
-            let challengeResult = await performAndValidateChallengeRequest(signUpToken: signUpToken, context: context)
+        case .success(let continuationToken):
+            let challengeResult = await performAndValidateChallengeRequest(signUpToken: continuationToken, context: context)
             return handleSignUpPasswordChallengeResult(challengeResult, username: username, event: event, context: context)
         case .attributeValidationFailed(let invalidAttributes):
             MSALLogger.log(
@@ -227,13 +222,8 @@ final class MSALNativeAuthSignUpController: MSALNativeAuthBaseController, MSALNa
         context: MSIDRequestContext
     ) async -> SignUpStartControllerResponse {
         switch result {
-        case .verificationRequired(let signUpToken, let unverifiedAttributes):
-            MSALLogger.log(
-                level: .info,
-                context: context,
-                format: "verification_required received from signup/start request for attributes: \(unverifiedAttributes)"
-            )
-            let challengeResult = await performAndValidateChallengeRequest(signUpToken: signUpToken, context: context)
+        case .success(let continuationToken):
+            let challengeResult = await performAndValidateChallengeRequest(signUpToken: continuationToken, context: context)
             return handleSignUpCodeChallengeResult(challengeResult, username: username, event: event, context: context)
         case .attributeValidationFailed(let invalidAttributes):
             MSALLogger.log(

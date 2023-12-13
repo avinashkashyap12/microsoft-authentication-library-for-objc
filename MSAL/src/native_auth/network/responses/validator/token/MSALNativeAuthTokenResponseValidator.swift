@@ -112,6 +112,10 @@ final class MSALNativeAuthTokenResponseValidator: MSALNativeAuthTokenResponseVal
                 return .error(.authorizationPending(message: responseError.errorDescription))
             case .slowDown:
                 return .error(.slowDown(message: responseError.errorDescription))
+            case .invalidOOBValue:
+                return .error(.invalidOOBCode(message: responseError.errorDescription))
+            case .userNotFound:
+                return .error(.userNotFound(message: responseError.errorDescription))
             }
         }
 

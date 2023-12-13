@@ -26,22 +26,24 @@ import Foundation
 
 struct MSALNativeAuthSignUpContinueResponseError: MSALNativeAuthResponseError {
     let error: MSALNativeAuthSignUpContinueOauth2ErrorCode
+    let subError: MSALNativeAuthSignUpContinueOauth2ErrorCode
     let errorDescription: String?
     let errorCodes: [Int]?
     let errorURI: String?
     let innerErrors: [MSALNativeAuthInnerError]?
-    let signUpToken: String?
+    let continuationToken: String?
     let requiredAttributes: [MSALNativeAuthRequiredAttributesInternal]?
     let unverifiedAttributes: [MSALNativeAuthErrorBasicAttributes]?
     let invalidAttributes: [MSALNativeAuthErrorBasicAttributes]?
 
     enum CodingKeys: String, CodingKey {
         case error
+        case subError = "suberror"
         case errorDescription = "error_description"
         case errorCodes = "error_codes"
         case errorURI = "error_uri"
         case innerErrors = "inner_errors"
-        case signUpToken = "signup_token"
+        case continuationToken = "continuation_token"
         case requiredAttributes = "required_attributes"
         case unverifiedAttributes = "unverified_attributes"
         case invalidAttributes = "invalid_attributes"
@@ -63,6 +65,7 @@ extension MSALNativeAuthSignUpContinueResponseError {
              .passwordTooLong,
              .passwordRecentlyUsed,
              .passwordBanned,
+             .passwordInvalid,
              .userAlreadyExists,
              .attributesRequired,
              .verificationRequired,
@@ -78,7 +81,8 @@ extension MSALNativeAuthSignUpContinueResponseError {
              .passwordTooShort,
              .passwordTooLong,
              .passwordRecentlyUsed,
-             .passwordBanned:
+             .passwordBanned,
+             .passwordInvalid:
             return .init(type: .invalidPassword, message: errorDescription)
         case .unauthorizedClient,
              .expiredToken,

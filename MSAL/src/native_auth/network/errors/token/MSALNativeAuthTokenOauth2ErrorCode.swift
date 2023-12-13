@@ -35,4 +35,6 @@ enum MSALNativeAuthTokenOauth2ErrorCode: String, Decodable {
     case invalidScope = "invalid_scope"
     case authorizationPending = "authorization_pending"
     case slowDown = "slow_down"
+    case invalidOOBValue = "invalid_oob_value"
+    case userNotFound = "user_not_found"
 }

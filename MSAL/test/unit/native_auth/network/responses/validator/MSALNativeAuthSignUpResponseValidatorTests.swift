@@ -65,46 +65,16 @@ final class MSALNativeAuthSignUpResponseValidatorTests: XCTestCase {
         XCTAssertEqual(result, .unexpectedError)
     }
 
-    func test_whenSignUpStart_verificationRequiredErrorWithSignUpTokenAndUnverifiedAttributes_it_returns_verificationRequired() {
-        let error = createSignUpStartError(
-            error: .verificationRequired,
-            signUpToken: "sign-up token",
-            unverifiedAttributes: [MSALNativeAuthErrorBasicAttributes(name: "username")]
-        )
-        let response: Result<MSALNativeAuthSignUpStartResponse, Error> = .failure(error)
+    func test_whenSignUpStart_succeedsWithContinuationToken_it_returns_success() {
+        let response: Result<MSALNativeAuthSignUpStartResponse, Error> = .success(.init(signupToken: "continuation_token", challengeType: nil))
 
         let result = sut.validate(response, with: context)
 
-        guard case .verificationRequired(let signUpToken, let unverifiedAttributes) = result else {
+        guard case let .success(continuationToken) = result else {
             return XCTFail("Unexpected response")
         }
 
-        XCTAssertEqual(signUpToken, "sign-up token")
-        XCTAssertEqual(unverifiedAttributes.first, "username")
-    }
-
-    func test_whenSignUpStart_verificationRequiredErrorWithSignUpToken_but_unverifiedAttributesIsEmpty_it_returns_unexpectedError() {
-        let error = createSignUpStartError(
-            error: .verificationRequired,
-            signUpToken: "sign-up token",
-            unverifiedAttributes: []
-        )
-        let response: Result<MSALNativeAuthSignUpStartResponse, Error> = .failure(error)
-
-        let result = sut.validate(response, with: context)
-        XCTAssertEqual(result, .unexpectedError)
-    }
-
-    func test_whenSignUpStart_verificationRequiredErrorWithSignUpToken_but_unverifiedAttributesIsNil_it_returns_unexpectedError() {
-        let error = createSignUpStartError(
-            error: .verificationRequired,
-            signUpToken: "sign-up token",
-            unverifiedAttributes: nil
-        )
-        let response: Result<MSALNativeAuthSignUpStartResponse, Error> = .failure(error)
-
-        let result = sut.validate(response, with: context)
-        XCTAssertEqual(result, .unexpectedError)
+        XCTAssertEqual(continuationToken, "continuation_token")
     }
 
     func test_whenSignUpStart_attributeValidationFailedWithSignUpTokenAndInvalidAttributes_it_returns_attributeValidationFailed() {
@@ -128,25 +98,6 @@ final class MSALNativeAuthSignUpResponseValidatorTests: XCTestCase {
             error: .attributeValidationFailed,
             invalidAttributes: []
         )
-        let response: Result<MSALNativeAuthSignUpStartResponse, Error> = .failure(error)
-
-        let result = sut.validate(response, with: context)
-        XCTAssertEqual(result, .unexpectedError)
-    }
-
-    func test_whenSignUpStart_attributeValidationFailedWithSignUpToken_but_invalidAttributesIsNil_it_returns_attributeValidationFailed() {
-        let error = createSignUpStartError(
-            error: .verificationRequired,
-            invalidAttributes: nil
-        )
-        let response: Result<MSALNativeAuthSignUpStartResponse, Error> = .failure(error)
-
-        let result = sut.validate(response, with: context)
-        XCTAssertEqual(result, .unexpectedError)
-    }
-
-    func test_whenSignUpStart_expectedVerificationRequiredErrorWithoutSignUpToken_it_returns_unexpectedError() {
-        let error = createSignUpStartError(error: .verificationRequired, signUpToken: nil)
         let response: Result<MSALNativeAuthSignUpStartResponse, Error> = .failure(error)
 
         let result = sut.validate(response, with: context)

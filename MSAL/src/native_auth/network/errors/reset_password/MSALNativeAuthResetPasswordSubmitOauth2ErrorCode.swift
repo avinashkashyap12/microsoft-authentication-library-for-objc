@@ -31,6 +31,7 @@ enum MSALNativeAuthResetPasswordSubmitOauth2ErrorCode: String, Decodable, CaseIt
     case passwordTooWeak = "password_too_weak"
     case passwordTooShort = "password_too_short"
     case passwordTooLong = "password_too_long"
+    case passwordInvalid = "password_is_invalid"
     case passwordRecentlyUsed = "password_recently_used"
     case passwordBanned = "password_banned"
 }

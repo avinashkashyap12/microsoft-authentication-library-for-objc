@@ -218,7 +218,8 @@ final class MSALNativeAuthResetPasswordResponseValidator: MSALNativeAuthResetPas
              .passwordTooShort,
              .passwordTooLong,
              .passwordRecentlyUsed,
-             .passwordBanned:
+             .passwordBanned,
+             .passwordInvalid:
             return .passwordError(error: apiError)
         case .invalidRequest,
              .invalidClient,
@@ -261,7 +262,8 @@ final class MSALNativeAuthResetPasswordResponseValidator: MSALNativeAuthResetPas
              .passwordTooShort,
              .passwordTooLong,
              .passwordRecentlyUsed,
-             .passwordBanned:
+             .passwordBanned,
+             .passwordInvalid:
             return .passwordError(error: apiError)
         case .userNotFound,
              .invalidRequest,

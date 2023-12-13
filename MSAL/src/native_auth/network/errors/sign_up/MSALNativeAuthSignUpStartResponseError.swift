@@ -27,21 +27,23 @@ import Foundation
 struct MSALNativeAuthSignUpStartResponseError: MSALNativeAuthResponseError {
 
     let error: MSALNativeAuthSignUpStartOauth2ErrorCode
+    let subError: MSALNativeAuthSignUpStartOauth2ErrorCode
     let errorDescription: String?
     let errorCodes: [Int]?
     let errorURI: String?
     let innerErrors: [MSALNativeAuthInnerError]?
-    let signUpToken: String?
+    let continuationToken: String?
     let unverifiedAttributes: [MSALNativeAuthErrorBasicAttributes]?
     let invalidAttributes: [MSALNativeAuthErrorBasicAttributes]?
 
     enum CodingKeys: String, CodingKey {
         case error
+        case subError = "suberror"
         case errorDescription = "error_description"
         case errorCodes = "error_codes"
         case errorURI = "error_uri"
         case innerErrors = "inner_errors"
-        case signUpToken = "signup_token"
+        case continuationToken = "continuation_token"
         case unverifiedAttributes = "unverified_attributes"
         case invalidAttributes = "invalid_attributes"
     }
@@ -51,11 +53,13 @@ extension MSALNativeAuthSignUpStartResponseError {
 
     func toSignUpStartPasswordPublicError() -> SignUpStartError {
         switch error {
-        case .passwordTooWeak,
+        case .invalidGrant,
+             .passwordTooWeak,
              .passwordTooShort,
              .passwordTooLong,
              .passwordRecentlyUsed,
-             .passwordBanned:
+             .passwordBanned,
+             .passwordInvalid:
             return .init(type: .invalidPassword, message: errorDescription)
         case .userAlreadyExists:
             return .init(type: .userAlreadyExists, message: errorDescription)
@@ -77,12 +81,14 @@ extension MSALNativeAuthSignUpStartResponseError {
         case .attributeValidationFailed,
              .attributesRequired,
              .unauthorizedClient,
+             .invalidGrant,
              .invalidRequest,
              .passwordTooWeak, /// password errors should not occur when signing up code
              .passwordTooShort,
              .passwordTooLong,
              .passwordRecentlyUsed,
              .passwordBanned,
+             .passwordInvalid,
              .unsupportedAuthMethod,
              .unsupportedChallengeType,
              .verificationRequired: /// .verificationRequired is not supported by the API team yet. We treat it as an unexpectedError in the validator
