@@ -73,6 +73,7 @@
 @implementation MSALResult (Internal)
 
 + (MSALResult *)resultWithAccessToken:(NSString *)accessToken
+                         refreshToken:(NSString *)refreshToken
                             expiresOn:(NSDate *)expiresOn
               isExtendedLifetimeToken:(BOOL)isExtendedLifetimeToken
                              tenantId:(NSString *)tenantId
@@ -87,6 +88,7 @@
 {
     MSALResult *result = [MSALResult new];
     result->_accessToken = accessToken;
+    result->_refreshToken = refreshToken;
     result->_expiresOn = expiresOn;
     result->_extendedLifeTimeToken = isExtendedLifetimeToken;
     result->_tenantId = tenantId;
@@ -154,6 +156,7 @@
     }
         
     return [self resultWithAccessToken:resultAccessToken
+                          refreshToken: tokenResult.refreshToken.refreshToken
                              expiresOn:tokenResult.accessToken.expiresOn
                isExtendedLifetimeToken:tokenResult.extendedLifeTimeToken
                               tenantId:tenantProfile.tenantId

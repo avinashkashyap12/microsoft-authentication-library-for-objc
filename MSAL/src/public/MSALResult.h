@@ -46,6 +46,12 @@
 @property (atomic, readonly, nonnull) NSString *accessToken;
 
 /**
+ The Refresh Token requested.
+ Note that if refresh token is not returned in token response, this property will be returned as an empty string.
+ */
+@property (atomic, readonly, nonnull) NSString *refreshToken;
+
+/**
     The time that the access token returned in the Token property ceases to be valid.
     This value is calculated based on current UTC time measured locally and the value expiresIn returned from the service
  */
