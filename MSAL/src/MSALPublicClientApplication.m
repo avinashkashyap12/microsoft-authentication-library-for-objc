@@ -111,6 +111,8 @@
 #import "MSIDAssymetricKeyLookupAttributes.h"
 #import "MSIDRequestTelemetryConstants.h"
 #import "MSALWipeCacheForAllAccountsConfig.h"
+#import "MSIDRefreshToken.h"
+#import "MSIDSilentTokenRequest.h"
 
 @interface MSALPublicClientApplication()
 {
@@ -1770,5 +1772,197 @@
     requestParams.validateAuthority = [self shouldValidateAuthorityForRequestAuthority:self.internalConfig.authority.msidAuthority];
     return requestParams;
 }
+- (void) refreshToken:(NSString *)refreshToken withParameters:(MSALSilentTokenParameters *)parameters completionBlock:(MSALCompletionBlock)completionBlock {
+    __auto_type block = ^(MSALResult *result, NSError *msidError, id<MSIDRequestContext> context)
+    {
+        NSError *msalError = [MSALErrorConverter msalErrorFromMsidError:msidError classifyErrors:YES msalOauth2Provider:self.msalOauth2Provider correlationId:context.correlationId authScheme:parameters.authenticationScheme popManager:self.popManager];
+        [MSALPublicClientApplication logOperation:@"acquireTokenSilent" result:result error:msalError context:context];
+        
+        if (!completionBlock) return;
+        
+        if (parameters.completionBlockQueue)
+        {
+            dispatch_async(parameters.completionBlockQueue, ^{
+                completionBlock(result, msalError);
+            });
+        }
+        else
+        {
+            completionBlock(result, msalError);
+        }
+    };
 
+    if (!parameters.account)
+    {
+        NSError *noAccountError = MSIDCreateError(MSIDErrorDomain, MSIDErrorInteractionRequired, @"No account provided for the silent request. Please call interactive acquireToken request to get an account identifier before calling acquireTokenSilent.", nil, nil, nil, nil, nil, YES);
+        block(nil, noAccountError, nil);
+        return;
+    }
+    
+    MSIDAuthority *providedAuthority = parameters.authority.msidAuthority ?: self.internalConfig.authority.msidAuthority;
+    MSIDAuthority *requestAuthority = providedAuthority;
+    
+    // This is meant to avoid developer error, when they configure PCA with e.g. AAD authority, but pass B2C authority here
+    // Authority type in PCA and parameters should match
+    if (![self.msalOauth2Provider isSupportedAuthority:requestAuthority])
+    {
+        NSError *msidError = MSIDCreateError(MSIDErrorDomain, MSIDErrorInvalidDeveloperParameter, @"Unsupported authority type. Please configure MSALPublicClientApplication with the same authority type", nil, nil, nil, nil, nil, YES);
+        block(nil, msidError, nil);
+        
+        return;
+    }
+    
+    BOOL shouldValidate = _validateAuthority;
+    BOOL isDeveloperKnownAuthority = [self shouldExcludeValidationForAuthority:requestAuthority];
+    
+    if (shouldValidate && isDeveloperKnownAuthority)
+    {
+        shouldValidate = NO;
+    }
+    
+    /*
+     In the acquire token silent call we assume developer wants to get access token for account's home tenant,
+     if authority is a common, organizations or consumers authority.
+     TODO: update instanceAware parameter to the instanceAware in config
+     */
+    NSError *authorityError = nil;
+    requestAuthority = [self.msalOauth2Provider issuerAuthorityWithAccount:parameters.account
+                                                          requestAuthority:requestAuthority
+                                                             instanceAware:self.internalConfig.multipleCloudsSupported
+                                                                     error:&authorityError];
+    
+    if (!requestAuthority)
+    {
+        MSID_LOG_WITH_CTX(MSIDLogLevelError, nil, @"Encountered an error when updating authority: %ld, %@", (long)authorityError.code, authorityError.domain);
+        
+        block(nil, authorityError, nil);
+        
+        return;
+    }
+    
+    requestAuthority.isDeveloperKnown = isDeveloperKnownAuthority;
+    
+    NSError *msidError = nil;
+    
+    MSIDRequestType requestType = [self requestType];
+    
+    id<MSALAuthenticationSchemeProtocol, MSALAuthenticationSchemeProtocolInternal>authenticationScheme = [self getInternalAuthenticationSchemeProtocolForScheme:parameters.authenticationScheme withError:&msidError];
+    
+    if (msidError)
+    {
+        block(nil, msidError, nil);
+        return;
+    }
+    
+    NSDictionary *schemeParams = [authenticationScheme getSchemeParameters:self.popManager];
+    MSIDAuthenticationScheme *msidAuthScheme = [authenticationScheme createMSIDAuthenticationSchemeWithParams:schemeParams];
+    
+    // add known authorities here.
+    MSIDRequestParameters *msidParams = [[MSIDRequestParameters alloc] initWithAuthority:requestAuthority
+                                                                              authScheme:msidAuthScheme
+                                                                         redirectUri:self.internalConfig.verifiedRedirectUri.url.absoluteString
+                                                                            clientId:self.internalConfig.clientId
+                                                                              scopes:[[NSOrderedSet alloc] initWithArray:parameters.scopes copyItems:YES]
+                                                                          oidcScopes:[self.class defaultOIDCScopes]
+                                                                       correlationId:parameters.correlationId
+                                                                      telemetryApiId:[NSString stringWithFormat:@"%ld", (long)parameters.telemetryApiId]
+                                                                 intuneAppIdentifier:[[NSBundle mainBundle] bundleIdentifier]
+                                                                             requestType:requestType
+                                                                               error:&msidError];
+    
+    if (!msidParams)
+    {
+        block(nil, msidError, nil);
+        return;
+    }
+    
+    // Set optional params
+    msidParams.accountIdentifier = parameters.account.lookupAccountIdentifier;
+    msidParams.validateAuthority = shouldValidate;
+    msidParams.extendedLifetimeEnabled = self.internalConfig.extendedLifetimeEnabled;
+    msidParams.clientCapabilities = self.internalConfig.clientApplicationCapabilities;
+        
+    // Extra parameters to be added to the /token endpoint.
+    msidParams.extraTokenRequestParameters = self.internalConfig.extraQueryParameters.extraTokenURLParameters;
+    
+    NSMutableDictionary *extraURLQueryParameters = [self.internalConfig.extraQueryParameters.extraURLQueryParameters mutableCopy];
+    [extraURLQueryParameters addEntriesFromDictionary:parameters.extraQueryParameters];
+    msidParams.extraURLQueryParameters = extraURLQueryParameters;
+
+    msidParams.tokenExpirationBuffer = self.internalConfig.tokenExpirationBuffer;
+    msidParams.claimsRequest = parameters.claimsRequest.msidClaimsRequest;
+    msidParams.providedAuthority = providedAuthority;
+    msidParams.instanceAware = self.internalConfig.multipleCloudsSupported;
+    msidParams.keychainAccessGroup = self.internalConfig.cacheConfig.keychainSharingGroup;
+    msidParams.currentRequestTelemetry = [MSIDCurrentRequestTelemetry new];
+    msidParams.currentRequestTelemetry.schemaVersion = HTTP_REQUEST_TELEMETRY_SCHEMA_VERSION;
+    msidParams.currentRequestTelemetry.apiId = [msidParams.telemetryApiId integerValue];
+    msidParams.currentRequestTelemetry.tokenCacheRefreshType = parameters.forceRefresh ? TokenCacheRefreshTypeForceRefresh : TokenCacheRefreshTypeNoCacheLookupInvolved;
+    msidParams.allowUsingLocalCachedRtWhenSsoExtFailed = parameters.allowUsingLocalCachedRtWhenSsoExtFailed;
+     
+    // Nested auth protocol
+    msidParams.nestedAuthBrokerClientId = self.internalConfig.nestedAuthBrokerClientId;
+    msidParams.nestedAuthBrokerRedirectUri = self.internalConfig.nestedAuthBrokerRedirectUri;
+    // Return early if account is in signed out state
+    NSError *signInStateError;
+    MSIDAccountMetadataState signInState = [self accountStateForParameters:msidParams error:&signInStateError];
+    
+    if (signInStateError)
+    {
+        block(nil, signInStateError, msidParams);
+        return;
+    }
+    
+    if (signInState == MSIDAccountMetadataStateSignedOut)
+    {
+        NSError *interactionError = MSIDCreateError(MSIDErrorDomain, MSIDErrorInteractionRequired, @"Account is signed out, user interaction is required.", nil, nil, nil, msidParams.correlationId, nil, YES);
+        block(nil, interactionError, msidParams);
+        return;
+    }
+    MSIDDefaultTokenRequestProvider *tokenRequestProvider = [[MSIDDefaultTokenRequestProvider alloc] initWithOauthFactory:self.msalOauth2Provider.msidOauth2Factory defaultAccessor:self.tokenCache accountMetadataAccessor:self.accountMetadataCache tokenResponseValidator:[MSIDDefaultTokenResponseValidator new]];
+    if ([msidParams isNestedAuthProtocol])
+    {
+        [msidParams reverseNestedAuthParametersIfNeeded];
+    }
+    NSString *upn = msidParams.accountIdentifier.displayableId;
+    [msidParams.authority resolveAndValidate:msidParams.validateAuthority
+                                       userPrincipalName:upn
+                                                 context:msidParams
+                                         completionBlock:^(__unused NSURL *openIdConfigurationEndpoint,
+                                                           __unused BOOL validated, NSError *localError)
+     {
+        if (localError)
+        {
+            completionBlock(nil, localError);
+            return;
+        }
+        
+        __auto_type request = [tokenRequestProvider silentTokenRequestWithParameters:msidParams
+                                                                             forceRefresh: parameters.forceRefresh];
+        [self acquireTokenWithRequest:request refreshToken:refreshToken completionBlock:^(MSIDTokenResult * result, NSError * error) {
+            if (error)
+            {
+                block(nil, error, msidParams);
+                return;
+            }
+            
+            NSError *resultError = nil;
+            MSALResult *msalResult = [self.msalOauth2Provider resultWithTokenResult:result authScheme:parameters.authenticationScheme popManager:self.popManager error:&resultError];
+            
+            if (result.tokenResponse)
+            {
+                // Only update external accounts if we got new result from network as an optimization
+                [self updateExternalAccountsWithResult:msalResult context:msidParams];
+            }
+            
+            block(msalResult, resultError, msidParams);
+        }];
+    }];
+}
+- (void)acquireTokenWithRequest:(MSIDSilentTokenRequest *)request
+                   refreshToken:(NSString *)refreshToken
+                completionBlock:(MSIDRequestCompletionBlock)completionBlock {
+    MSIDRefreshToken *token = [[MSIDRefreshToken alloc] initWithToken: refreshToken];
+    [request tryRefreshToken:token tokenType:MSIDAppRefreshTokenType completionBlock:completionBlock];
+}
 @end

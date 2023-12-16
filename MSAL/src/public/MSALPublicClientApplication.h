@@ -283,6 +283,19 @@
 - (void)acquireTokenWithParameters:(nonnull MSALInteractiveTokenParameters *)parameters
                    completionBlock:(nonnull MSALCompletionBlock)completionBlock;
 
+
+/**
+ Acquire a token for a provided parameters using interactive authentication.
+ 
+ @param  refreshToken Refresh token
+ @param  parameters Parameters used for interactive authentication.
+ @param  completionBlock The completion block that will be called when the authentication
+ flow completes, or encounters an error.
+ */
+- (void) refreshToken:(nonnull NSString *)refreshToken
+       withParameters:(nonnull MSALSilentTokenParameters *)parameters
+      completionBlock:(nonnull MSALCompletionBlock)completionBlock;
+
 /**
     Acquire a token for a new account using interactive authentication
  
